@@ -1,30 +1,31 @@
 import pandas as pd
-import numpy as np
-from sklearn.preprocessing import MinMaxScaler
 
-def read_and_preprocess(file_path, seq_len=24):
-    df = pd.read_csv(file_path, sep=';', low_memory=False, na_values='?')
-    df.dropna(inplace=True)
+# 데이터 파일 경로 설정
+file_path = 'household_power_consumption.txt'
+# 데이터 로드
+df = pd.read_csv(
+    file_path,
+    sep=';',  # 세미콜론으로 구분된 텍스트 파일
+    parse_dates={'Datetime': ['Date', 'Time']},
+    infer_datetime_format=True,
+    na_values='?',
+    low_memory=False
+)
 
-    # Datetime 병합 및 정렬
-    df['Datetime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], format='%d/%m/%Y %H:%M:%S')
-    df.sort_values('Datetime', inplace=True)
-    df.set_index('Datetime', inplace=True)
+# 데이터의 shape 확인
+print(df.shape)
 
-    # 필요한 컬럼만 사용
-    data = df[['Global_active_power']].astype('float32')
+# 데이터의 head 확인
+print(df.head())
 
-    # 정규화
-    scaler = MinMaxScaler()
-    data_scaled = scaler.fit_transform(data)
+# 전력 소비 컬럼을 float으로 변환
+df['Global_active_power'] = pd.to_numeric(df['Global_active_power'], errors='coerce')
 
-    # 시퀀스 데이터 생성
-    X, y = [], []
-    for i in range(seq_len, len(data_scaled)):
-        X.append(data_scaled[i-seq_len:i])
-        y.append(data_scaled[i])
-    X, y = np.array(X), np.array(y)
+# 결측치 제거
+df = df.dropna()
 
-    # 훈련/테스트 분할 (80/20)
-    split = int(len(X) * 0.8)
-    return X[:split], y[:split], X[split:], y[split:], scaler
+# 시간 인덱스 설정
+df.set_index('Datetime', inplace=True)
+
+# 1일 단위로 리샘플링 
+daily_power = df['Global_active_power'].resample('D').mean()
